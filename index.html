@@ -5,7 +5,7 @@
   <title>Mapa PMTiles</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
-  <!-- MapLibre JS global (no módulo) -->
+  <!-- MapLibre global (no módulo) -->
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <style>
     html,body,#map{height:100%;margin:0}
@@ -19,55 +19,76 @@
   Capa: <select id="layerSelect"></select>
 </div>
 
-<!-- Tu lógica en módulo (solo PMTiles en ESM) -->
 <script type="module">
   import { PMTiles, Protocol } from "https://esm.sh/pmtiles@4";
 
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + RAW_URL;
 
-  // Registrar el protocolo pmtiles:// usando la API global de MapLibre
+  // Registrar el protocolo pmtiles://
   const protocol = new Protocol();
-  // window.maplibregl viene del <script> global
   maplibregl.addProtocol("pmtiles", protocol.tile);
 
-  // Style base vacío
+  // Style base
   const style = {
     version: 8,
     sources: {},
     layers: [{ id: "bg", type: "background", paint: { "background-color": "#eef2f3" } }]
   };
 
-  // Crear mapa (API global)
   const map = new maplibregl.Map({
     container: "map",
     style,
-    center: [-3.7038, 40.4168],
+    center: [-3.7038, 40.4168], // fallback
     zoom: 6
   });
+  map.addControl(new maplibregl.NavigationControl());
 
   try {
-    // Lee metadatos del PMTiles para detectar si es vector o ráster
+    // 1) Metadatos del PMTiles
     const p = new PMTiles(RAW_URL);
     const metadata = await p.getMetadata();
-    const vectorLayers = (metadata?.vector_layers || []).map(l => l.id);
     console.log("PMTiles metadata:", metadata);
 
+    // 2) Si hay 'bounds' en metadatos, encuadra el mapa
+    // bounds: "west,south,east,north"
+    if (metadata?.bounds) {
+      const [w,s,e,n] = metadata.bounds.split(",").map(Number);
+      map.fitBounds([[w, s], [e, n]], { padding: 20, duration: 0 });
+    } else if (metadata?.center) {
+      // center: "lon,lat,zoom" (algunos archivos lo traen)
+      const [lon,lat,z] = metadata.center.split(",").map(Number);
+      map.setCenter([lon,lat]); if (!Number.isNaN(z)) map.setZoom(z);
+    }
+
     map.on("load", () => {
+      const vectorLayers = (metadata?.vector_layers || []).map(l => l.id);
+
       if (vectorLayers.length > 0) {
-        // ---- VECTOR ----
+        // ====== VECTOR ======
         map.addSource("datos", { type: "vector", url: PMTILES_URL });
 
         const first = vectorLayers[0];
+
+        // RELLENO (por si son polígonos)
         map.addLayer({
-          id: "poligonos",
+          id: "poligonos-fill",
           type: "fill",
           source: "datos",
           "source-layer": first,
-          paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
+          paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.65 }
         });
 
-        // Selector de capas
+        // CONTORNO (si son líneas/ver bordes)
+        map.addLayer({
+          id: "poligonos-line",
+          type: "line",
+          source: "datos",
+          "source-layer": first,
+          paint: { "line-color": "#1b4f72", "line-width": 0.6 }
+        });
+
+        // UI de selección de capa
         const sel = document.getElementById("layerSelect");
         const ui = document.getElementById("ui");
         vectorLayers.forEach(id => {
@@ -77,18 +98,26 @@
         sel.value = first; ui.hidden = false;
 
         sel.addEventListener("change", () => {
-          if (map.getLayer("poligonos")) map.removeLayer("poligonos");
+          if (map.getLayer("poligonos-fill")) map.removeLayer("poligonos-fill");
+          if (map.getLayer("poligonos-line")) map.removeLayer("poligonos-line");
           map.addLayer({
-            id: "poligonos",
+            id: "poligonos-fill",
             type: "fill",
             source: "datos",
             "source-layer": sel.value,
-            paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
+            paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.65 }
+          });
+          map.addLayer({
+            id: "poligonos-line",
+            type: "line",
+            source: "datos",
+            "source-layer": sel.value,
+            paint: { "line-color": "#1b4f72", "line-width": 0.6 }
           });
         });
 
       } else {
-        // ---- RÁSTER ----
+        // ====== RÁSTER ======
         map.addSource("datos_raster", { type: "raster", url: PMTILES_URL, tileSize: 256 });
         map.addLayer({ id: "raster", type: "raster", source: "datos_raster" });
       }
