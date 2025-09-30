@@ -18,9 +18,9 @@
 </div>
 
 <script type="module">
-  // IMPORTS (ESM correctos)
+  // IMPORTS (ESM fiables)
   import * as maplibregl from "https://cdn.jsdelivr.net/npm/maplibre-gl@3/dist/maplibre-gl.js";
-  import { PMTiles, Protocol } from "https://cdn.jsdelivr.net/npm/pmtiles@4.3.0/dist/pmtiles.mjs";
+  import { PMTiles, Protocol } from "https://esm.sh/pmtiles@4";
 
   // URL de tu archivo en GitHub Pages
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
@@ -53,7 +53,7 @@
 
     map.on("load", () => {
       if (vectorLayers.length > 0) {
-        // ----- VECTOR -----
+        // ---- VECTOR ----
         map.addSource("datos", { type: "vector", url: PMTILES_URL });
 
         const first = vectorLayers[0];
@@ -65,12 +65,11 @@
           paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
         });
 
-        // selector de capas
+        // Selector de capas
         const sel = document.getElementById("layerSelect");
         const ui = document.getElementById("ui");
         vectorLayers.forEach(id => {
-          const o = document.createElement("option");
-          o.value = id; o.textContent = id; sel.appendChild(o);
+          const o = document.createElement("option"); o.value = id; o.textContent = id; sel.appendChild(o);
         });
         sel.value = first; ui.hidden = false;
 
@@ -86,7 +85,7 @@
         });
 
       } else {
-        // ----- RÁSTER -----
+        // ---- RÁSTER ----
         map.addSource("datos_raster", { type: "raster", url: PMTILES_URL, tileSize: 256 });
         map.addLayer({ id: "raster", type: "raster", source: "datos_raster" });
       }
