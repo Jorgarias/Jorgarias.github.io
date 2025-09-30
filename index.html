@@ -18,33 +18,33 @@
 </div>
 
 <script type="module">
-  // IMPORTS (ESM fiables)
-  import * as maplibregl from "https://cdn.jsdelivr.net/npm/maplibre-gl@3/dist/maplibre-gl.js";
+  // IMPORTS (en v3 addProtocol es export nombrada)
+  import { Map, addProtocol } from "https://cdn.jsdelivr.net/npm/maplibre-gl@3/dist/maplibre-gl.js";
   import { PMTiles, Protocol } from "https://esm.sh/pmtiles@4";
 
-  // URL de tu archivo en GitHub Pages
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + RAW_URL;
 
-  // Habilita el protocolo pmtiles://
+  // Registrar el protocolo pmtiles://
   const protocol = new Protocol();
-  maplibregl.addProtocol("pmtiles", protocol.tile);
+  addProtocol("pmtiles", protocol.tile);
 
-  // Style base
+  // Style base vacío
   const style = {
     version: 8,
     sources: {},
     layers: [{ id: "bg", type: "background", paint: { "background-color": "#eef2f3" } }]
   };
 
-  const map = new maplibregl.Map({
+  // Crear mapa
+  const map = new Map({
     container: "map",
     style,
     center: [-3.7038, 40.4168],
     zoom: 6
   });
 
-  // Detecta si el PMTiles es vector o ráster y lo pinta
+  // Detectar si el PMTiles es vector o ráster y pintarlo
   try {
     const p = new PMTiles(RAW_URL);
     const metadata = await p.getMetadata();
@@ -65,7 +65,7 @@
           paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
         });
 
-        // Selector de capas
+        // selector de capas
         const sel = document.getElementById("layerSelect");
         const ui = document.getElementById("ui");
         vectorLayers.forEach(id => {
@@ -92,7 +92,7 @@
     });
   } catch (e) {
     console.error(e);
-    alert("Error leyendo metadatos del PMTiles. Revisa la consola (F12 → Console).");
+    alert("Error leyendo metadatos del PMTiles. Abre la consola (F12 → Console) para más detalle.");
   }
 </script>
 </body>
