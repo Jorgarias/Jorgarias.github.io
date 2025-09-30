@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Mapa PMTiles (auto capas)</title>
+  <title>Mapa PMTiles</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link href="https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.css" rel="stylesheet">
   <style>
@@ -21,7 +21,6 @@
   import maplibregl from "https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.js";
   import * as pmtiles from "https://unpkg.com/pmtiles@^3/dist/pmtiles.js";
 
-  // URLs a tu archivo
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + RAW_URL;
 
@@ -29,19 +28,13 @@
   const protocol = new pmtiles.Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
 
-  // Lee metadatos para descubrir los 'source-layer'
-  const p = new pmtiles.PMTiles(RAW_URL);
-  const metadata = await p.getMetadata().catch(e => { console.error(e); alert("No se pudieron leer metadatos del PMTiles."); });
-  const layers = (metadata?.vector_layers || []).map(l => l.id);
-
-  // Crea el style base
+  // Crea el mapa con un style base
   const style = {
     version: 8,
     sources: { datos: { type: "vector", url: PMTILES_URL } },
     layers: [{ id: "bg", type: "background", paint: { "background-color": "#eef2f3" } }]
   };
 
-  // Si hay capas vectoriales, añade una capa 'fill' para la primera
   const map = new maplibregl.Map({
     container: "map",
     style,
@@ -49,41 +42,48 @@
     zoom: 6
   });
 
-  if (layers.length > 0) {
-    const first = layers[0];
-    style.layers.push({
-      id: "poligonos",
-      type: "fill",
-      source: "datos",
-      "source-layer": first,
-      paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
-    });
-    map.setStyle(style);
+  // Descubre capas del PMTiles y pinta la primera
+  try {
+    const p = new pmtiles.PMTiles(RAW_URL);
+    const metadata = await p.getMetadata();
+    const layers = (metadata && metadata.vector_layers) ? metadata.vector_layers.map(l => l.id) : [];
 
-    // UI para cambiar de capa
-    const sel = document.getElementById("layerSelect");
-    const ui = document.getElementById("ui");
-    layers.forEach(id => { const opt = document.createElement("option"); opt.value = id; opt.textContent = id; sel.appendChild(opt); });
-    sel.value = first;
-    ui.hidden = false;
-
-    sel.addEventListener("change", () => {
-      map.setLayoutProperty("poligonos", "visibility", "none");
-      map.removeLayer("poligonos");
-      map.addLayer({
-        id: "poligonos",
-        type: "fill",
-        source: "datos",
-        "source-layer": sel.value,
-        paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
+    if (!layers.length) {
+      alert("No se encontraron capas vectoriales en el PMTiles. ¿Seguro que es vector (pbf)?");
+    } else {
+      const first = layers[0];
+      map.on("load", () => {
+        map.addLayer({
+          id: "poligonos",
+          type: "fill",
+          source: "datos",
+          "source-layer": first,
+          paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
+        });
       });
-    });
-  } else {
-    console.warn("No se encontraron 'vector_layers' en los metadatos. ¿Seguro que es vector (pbf)?");
-    alert("No se encontraron capas vectoriales en los metadatos del PMTiles.");
+
+      // UI para cambiar de capa
+      const sel = document.getElementById("layerSelect");
+      const ui = document.getElementById("ui");
+      layers.forEach(id => { const opt = document.createElement("option"); opt.value = id; opt.textContent = id; sel.appendChild(opt); });
+      sel.value = first;
+      ui.hidden = false;
+
+      sel.addEventListener("change", () => {
+        if (map.getLayer("poligonos")) map.removeLayer("poligonos");
+        map.addLayer({
+          id: "poligonos",
+          type: "fill",
+          source: "datos",
+          "source-layer": sel.value,
+          paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
+        });
+      });
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Error leyendo metadatos del PMTiles.");
   }
 </script>
 </body>
 </html>
-
-
