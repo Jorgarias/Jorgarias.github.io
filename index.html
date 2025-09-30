@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <title>Mapa PMTiles</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link href="https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@3/dist/maplibre-gl.css" rel="stylesheet">
   <style>
     html,body,#map{height:100%;margin:0}
     #ui{position:absolute;z-index:1;top:10px;left:10px;background:#fff;padding:8px;border-radius:8px;font:14px sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.1)}
@@ -18,19 +18,19 @@
 </div>
 
 <script type="module">
-  // IMPORTS (correctos para ESM)
-  import * as maplibregl from "https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.js";
-  import { PMTiles, Protocol } from "https://unpkg.com/pmtiles@^3/dist/pmtiles.mjs";
+  // IMPORTS (ESM con CORS OK)
+  import * as maplibregl from "https://cdn.jsdelivr.net/npm/maplibre-gl@3/dist/maplibre-gl.js";
+  import { PMTiles, Protocol } from "https://cdn.jsdelivr.net/npm/pmtiles@3/dist/pmtiles.mjs";
 
   // URL de tu archivo en GitHub Pages
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + RAW_URL;
 
-  // Habilita el protocolo pmtiles:// en MapLibre
+  // Habilita el protocolo pmtiles://
   const protocol = new Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
 
-  // Mapa base
+  // Style base
   const style = {
     version: 8,
     sources: {},
@@ -44,11 +44,11 @@
     zoom: 6
   });
 
-  // Detecta automáticamente si el PMTiles es vector o ráster y lo pinta
+  // Detecta si el PMTiles es vector o ráster y lo pinta
   try {
     const p = new PMTiles(RAW_URL);
     const metadata = await p.getMetadata();
-    const vectorLayers = (metadata && metadata.vector_layers) ? metadata.vector_layers.map(l => l.id) : [];
+    const vectorLayers = (metadata?.vector_layers || []).map(l => l.id);
     console.log("PMTiles metadata:", metadata);
 
     map.on("load", () => {
@@ -68,7 +68,9 @@
         // selector de capas
         const sel = document.getElementById("layerSelect");
         const ui = document.getElementById("ui");
-        vectorLayers.forEach(id => { const o=document.createElement("option"); o.value=id; o.textContent=id; sel.appendChild(o); });
+        vectorLayers.forEach(id => {
+          const o = document.createElement("option"); o.value = id; o.textContent = id; sel.appendChild(o);
+        });
         sel.value = first; ui.hidden = false;
 
         sel.addEventListener("change", () => {
@@ -81,20 +83,10 @@
             paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
           });
         });
-
       } else {
         // ----- RÁSTER -----
-        map.addSource("datos_raster", {
-          type: "raster",
-          url: PMTILES_URL,
-          tileSize: 256
-        });
-        map.addLayer({
-          id: "raster",
-          type: "raster",
-          source: "datos_raster",
-          paint: { "raster-opacity": 1 }
-        });
+        map.addSource("datos_raster", { type: "raster", url: PMTILES_URL, tileSize: 256 });
+        map.addLayer({ id: "raster", type: "raster", source: "datos_raster" });
       }
     });
   } catch (e) {
