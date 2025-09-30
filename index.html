@@ -18,26 +18,24 @@
 </div>
 
 <script type="module">
-  // IMPORTS (ojo: v3 no tiene export default)
   import * as maplibregl from "https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.js";
   import * as pmtiles from "https://unpkg.com/pmtiles@^3/dist/pmtiles.js";
 
-  // Ruta a tu archivo en GitHub Pages
+  // URL de tu archivo en GitHub Pages
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + RAW_URL;
 
-  // Habilita el protocolo pmtiles:// en MapLibre
+  // Habilita el protocolo pmtiles://
   const protocol = new pmtiles.Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
 
-  // Style base
+  // Mapa base
   const style = {
     version: 8,
-    sources: { datos: { type: "vector", url: PMTILES_URL } },
+    sources: {},
     layers: [{ id: "bg", type: "background", paint: { "background-color": "#eef2f3" } }]
   };
 
-  // Crea el mapa
   const map = new maplibregl.Map({
     container: "map",
     style,
@@ -45,18 +43,20 @@
     zoom: 6
   });
 
-  // Descubre capas dentro del PMTiles y pinta la primera
+  // Detecta automáticamente si el PMTiles es vector o ráster y lo pinta
   try {
     const p = new pmtiles.PMTiles(RAW_URL);
     const metadata = await p.getMetadata();
-    const layers = (metadata && metadata.vector_layers) ? metadata.vector_layers.map(l => l.id) : [];
+    const vectorLayers = (metadata && metadata.vector_layers) ? metadata.vector_layers.map(l => l.id) : [];
+    console.log("PMTiles metadata:", metadata);
 
-    if (!layers.length) {
-      alert("No se encontraron capas vectoriales en el PMTiles. ¿Seguro que es vector (pbf)?");
-    } else {
-      const first = layers[0];
+    map.on("load", () => {
+      if (vectorLayers.length > 0) {
+        // ----- VECTOR -----
+        map.addSource("datos", { type: "vector", url: PMTILES_URL });
 
-      map.on("load", () => {
+        // capa inicial
+        const first = vectorLayers[0];
         map.addLayer({
           id: "poligonos",
           type: "fill",
@@ -64,31 +64,43 @@
           "source-layer": first,
           paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
         });
-      });
 
-      // UI para cambiar de capa
-      const sel = document.getElementById("layerSelect");
-      const ui = document.getElementById("ui");
-      layers.forEach(id => {
-        const opt = document.createElement("option");
-        opt.value = id; opt.textContent = id; sel.appendChild(opt);
-      });
-      sel.value = first; ui.hidden = false;
+        // selector de capas
+        const sel = document.getElementById("layerSelect");
+        const ui = document.getElementById("ui");
+        vectorLayers.forEach(id => { const o=document.createElement("option"); o.value=id; o.textContent=id; sel.appendChild(o); });
+        sel.value = first; ui.hidden = false;
 
-      sel.addEventListener("change", () => {
-        if (map.getLayer("poligonos")) map.removeLayer("poligonos");
-        map.addLayer({
-          id: "poligonos",
-          type: "fill",
-          source: "datos",
-          "source-layer": sel.value,
-          paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
+        sel.addEventListener("change", () => {
+          if (map.getLayer("poligonos")) map.removeLayer("poligonos");
+          map.addLayer({
+            id: "poligonos",
+            type: "fill",
+            source: "datos",
+            "source-layer": sel.value,
+            paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
+          });
         });
-      });
-    }
+
+      } else {
+        // ----- RÁSTER -----
+        // Si no hay vector_layers, probamos como ráster (png/jpg/webp)
+        map.addSource("datos_raster", {
+          type: "raster",
+          url: PMTILES_URL,
+          tileSize: 256
+        });
+        map.addLayer({
+          id: "raster",
+          type: "raster",
+          source: "datos_raster",
+          paint: { "raster-opacity": 1 }
+        });
+      }
+    });
   } catch (e) {
     console.error(e);
-    alert("Error leyendo metadatos del PMTiles.");
+    alert("Error leyendo metadatos del PMTiles. Revisa la consola (F12 → Console).");
   }
 </script>
 </body>
