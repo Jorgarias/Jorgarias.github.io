@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Mapa secciones censales</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link href="https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.css" rel="stylesheet">
+  <style>html,body,#map{height:100%;margin:0}</style>
+</head>
+<body>
+<div id="map"></div>
+
+<script type="module">
+  import maplibregl from "https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.js";
+  import { Protocol } from "https://unpkg.com/pmtiles@^3/dist/pmtiles.js";
+
+  // habilita protocolo pmtiles://
+  const protocol = new Protocol();
+  maplibregl.addProtocol("pmtiles", protocol.tile);
+
+  // tu archivo .pmtiles en GitHub Pages
+  const PMTILES_URL = "pmtiles://https://jorgarias.github.io/inmigracion_diff_far.pmtiles";
+
+  const style = {
+    version: 8,
+    sources: {
+      censal: { type: "vector", url: PMTILES_URL }
+    },
+    layers: [
+      { id: "fondo", type: "background", paint: {"background-color": "#eeeeee"} },
+      {
+        id: "secciones",
+        type: "fill",
+        source: "censal",
+        "source-layer": "inmigracion_diff_far",  <!-- cambia si tu capa interna tiene otro nombre -->
+        paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
+      }
+    ]
+  };
+
+  new maplibregl.Map({
+    container: "map",
+    style,
+    center: [-3.7038, 40.4168],
+    zoom: 6
+  });
+</script>
+</body>
+</html>
