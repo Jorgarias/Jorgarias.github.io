@@ -18,15 +18,16 @@
 </div>
 
 <script type="module">
+  // IMPORTS (correctos para ESM)
   import * as maplibregl from "https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.js";
-  import * as pmtiles from "https://unpkg.com/pmtiles@^3/dist/pmtiles.js";
+  import { PMTiles, Protocol } from "https://unpkg.com/pmtiles@^3/dist/pmtiles.mjs";
 
   // URL de tu archivo en GitHub Pages
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + RAW_URL;
 
-  // Habilita el protocolo pmtiles://
-  const protocol = new pmtiles.Protocol();
+  // Habilita el protocolo pmtiles:// en MapLibre
+  const protocol = new Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
 
   // Mapa base
@@ -45,7 +46,7 @@
 
   // Detecta automáticamente si el PMTiles es vector o ráster y lo pinta
   try {
-    const p = new pmtiles.PMTiles(RAW_URL);
+    const p = new PMTiles(RAW_URL);
     const metadata = await p.getMetadata();
     const vectorLayers = (metadata && metadata.vector_layers) ? metadata.vector_layers.map(l => l.id) : [];
     console.log("PMTiles metadata:", metadata);
@@ -55,7 +56,6 @@
         // ----- VECTOR -----
         map.addSource("datos", { type: "vector", url: PMTILES_URL });
 
-        // capa inicial
         const first = vectorLayers[0];
         map.addLayer({
           id: "poligonos",
@@ -84,7 +84,6 @@
 
       } else {
         // ----- RÁSTER -----
-        // Si no hay vector_layers, probamos como ráster (png/jpg/webp)
         map.addSource("datos_raster", {
           type: "raster",
           url: PMTILES_URL,
