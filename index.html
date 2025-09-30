@@ -18,9 +18,9 @@
 </div>
 
 <script type="module">
-  // IMPORTS (ESM con CORS OK)
+  // IMPORTS (ESM correctos)
   import * as maplibregl from "https://cdn.jsdelivr.net/npm/maplibre-gl@3/dist/maplibre-gl.js";
-  import { PMTiles, Protocol } from "https://cdn.jsdelivr.net/npm/pmtiles@3/dist/pmtiles.mjs";
+  import { PMTiles, Protocol } from "https://cdn.jsdelivr.net/npm/pmtiles@4.3.0/dist/pmtiles.mjs";
 
   // URL de tu archivo en GitHub Pages
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
@@ -69,7 +69,8 @@
         const sel = document.getElementById("layerSelect");
         const ui = document.getElementById("ui");
         vectorLayers.forEach(id => {
-          const o = document.createElement("option"); o.value = id; o.textContent = id; sel.appendChild(o);
+          const o = document.createElement("option");
+          o.value = id; o.textContent = id; sel.appendChild(o);
         });
         sel.value = first; ui.hidden = false;
 
@@ -83,6 +84,7 @@
             paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
           });
         });
+
       } else {
         // ----- RÁSTER -----
         map.addSource("datos_raster", { type: "raster", url: PMTILES_URL, tileSize: 256 });
