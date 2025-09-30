@@ -5,7 +5,6 @@
   <title>Mapa PMTiles</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
-  <!-- MapLibre global (no módulo) -->
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <style>
     html,body,#map{height:100%;margin:0}
@@ -25,106 +24,109 @@
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + RAW_URL;
 
-  // Registrar el protocolo pmtiles://
+  // Registrar protocolo pmtiles://
   const protocol = new Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
 
-  // Style base
+  // Style con fondo OSM para orientarse (en producción mejor usar tu propio fondo)
   const style = {
     version: 8,
-    sources: {},
-    layers: [{ id: "bg", type: "background", paint: { "background-color": "#eef2f3" } }]
+    sources: {
+      osm: {
+        type: "raster",
+        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+        tileSize: 256,
+        attribution: "© OpenStreetMap contributors"
+      }
+    },
+    layers: [
+      { id: "osm", type: "raster", source: "osm" }
+    ]
   };
 
   const map = new maplibregl.Map({
     container: "map",
     style,
-    center: [-3.7038, 40.4168], // fallback
-    zoom: 6
+    center: [-3.7, 40.4], // Madrid como fallback
+    zoom: 5
   });
   map.addControl(new maplibregl.NavigationControl());
 
   try {
-    // 1) Metadatos del PMTiles
+    // Metadatos del PMTiles
     const p = new PMTiles(RAW_URL);
     const metadata = await p.getMetadata();
     console.log("PMTiles metadata:", metadata);
 
-    // 2) Si hay 'bounds' en metadatos, encuadra el mapa
-    // bounds: "west,south,east,north"
+    // Ajuste de vista si hay info
     if (metadata?.bounds) {
       const [w,s,e,n] = metadata.bounds.split(",").map(Number);
-      map.fitBounds([[w, s], [e, n]], { padding: 20, duration: 0 });
+      map.fitBounds([[w,s],[e,n]], { padding: 30, duration: 0 });
     } else if (metadata?.center) {
-      // center: "lon,lat,zoom" (algunos archivos lo traen)
       const [lon,lat,z] = metadata.center.split(",").map(Number);
-      map.setCenter([lon,lat]); if (!Number.isNaN(z)) map.setZoom(z);
+      if (!Number.isNaN(lon) && !Number.isNaN(lat)) map.setCenter([lon,lat]);
+      if (!Number.isNaN(z)) map.setZoom(z);
+    } else if (typeof metadata?.minzoom === "number") {
+      map.setZoom(Math.max(0, metadata.minzoom));
     }
 
     map.on("load", () => {
       const vectorLayers = (metadata?.vector_layers || []).map(l => l.id);
 
       if (vectorLayers.length > 0) {
-        // ====== VECTOR ======
+        // Fuente vectorial desde PMTiles
         map.addSource("datos", { type: "vector", url: PMTILES_URL });
 
         const first = vectorLayers[0];
 
-        // RELLENO (por si son polígonos)
+        // Tres capas para cualquier geometría
         map.addLayer({
-          id: "poligonos-fill",
+          id: "overlay-fill",
           type: "fill",
           source: "datos",
           "source-layer": first,
-          paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.65 }
+          paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.55 }
         });
 
-        // CONTORNO (si son líneas/ver bordes)
         map.addLayer({
-          id: "poligonos-line",
+          id: "overlay-line",
           type: "line",
           source: "datos",
           "source-layer": first,
-          paint: { "line-color": "#1b4f72", "line-width": 0.6 }
+          paint: { "line-color": "#1b4f72", "line-width": 0.7 }
         });
 
-        // UI de selección de capa
+        map.addLayer({
+          id: "overlay-points",
+          type: "circle",
+          source: "datos",
+          "source-layer": first,
+          paint: { "circle-radius": 2.2, "circle-opacity": 0.9 }
+        });
+
+        // Selector de capas
         const sel = document.getElementById("layerSelect");
         const ui = document.getElementById("ui");
-        vectorLayers.forEach(id => {
-          const opt = document.createElement("option");
-          opt.value = id; opt.textContent = id; sel.appendChild(opt);
-        });
+        vectorLayers.forEach(id => { const o=document.createElement("option"); o.value=id; o.textContent=id; sel.appendChild(o); });
         sel.value = first; ui.hidden = false;
 
         sel.addEventListener("change", () => {
-          if (map.getLayer("poligonos-fill")) map.removeLayer("poligonos-fill");
-          if (map.getLayer("poligonos-line")) map.removeLayer("poligonos-line");
-          map.addLayer({
-            id: "poligonos-fill",
-            type: "fill",
-            source: "datos",
-            "source-layer": sel.value,
-            paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.65 }
-          });
-          map.addLayer({
-            id: "poligonos-line",
-            type: "line",
-            source: "datos",
-            "source-layer": sel.value,
-            paint: { "line-color": "#1b4f72", "line-width": 0.6 }
-          });
+          ["overlay-fill","overlay-line","overlay-points"].forEach(id => { if (map.getLayer(id)) map.removeLayer(id); });
+          map.addLayer({ id:"overlay-fill", type:"fill", source:"datos", "source-layer": sel.value, paint:{ "fill-color":"#2b8cbe", "fill-opacity":0.55 }});
+          map.addLayer({ id:"overlay-line", type:"line", source:"datos", "source-layer": sel.value, paint:{ "line-color":"#1b4f72", "line-width":0.7 }});
+          map.addLayer({ id:"overlay-points", type:"circle", source:"datos", "source-layer": sel.value, paint:{ "circle-radius":2.2, "circle-opacity":0.9 }});
         });
 
       } else {
-        // ====== RÁSTER ======
+        // Ráster desde PMTiles
         map.addSource("datos_raster", { type: "raster", url: PMTILES_URL, tileSize: 256 });
-        map.addLayer({ id: "raster", type: "raster", source: "datos_raster" });
+        map.addLayer({ id: "raster", type: "raster", source: "datos_raster", paint: {"raster-opacity": 0.9} });
       }
     });
+
   } catch (e) {
     console.error(e);
-    alert("Error leyendo metadatos del PMTiles. Abre la consola (F12 → Console) para ver detalles.");
+    alert("No se pudieron leer metadatos del PMTiles. Mira la consola.");
   }
 </script>
 </body>
