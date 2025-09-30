@@ -7,7 +7,7 @@
   <link href="https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.css" rel="stylesheet">
   <style>
     html,body,#map{height:100%;margin:0}
-    #ui{position:absolute;z-index:1;top:10px;left:10px;background:#fff;padding:8px;border-radius:8px;font:14px sans-serif}
+    #ui{position:absolute;z-index:1;top:10px;left:10px;background:#fff;padding:8px;border-radius:8px;font:14px sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.1)}
     select{font:inherit}
   </style>
 </head>
@@ -18,23 +18,26 @@
 </div>
 
 <script type="module">
-  import maplibregl from "https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.js";
+  // IMPORTS (ojo: v3 no tiene export default)
+  import * as maplibregl from "https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.js";
   import * as pmtiles from "https://unpkg.com/pmtiles@^3/dist/pmtiles.js";
 
+  // Ruta a tu archivo en GitHub Pages
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + RAW_URL;
 
-  // Habilita el protocolo pmtiles://
+  // Habilita el protocolo pmtiles:// en MapLibre
   const protocol = new pmtiles.Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
 
-  // Crea el mapa con un style base
+  // Style base
   const style = {
     version: 8,
     sources: { datos: { type: "vector", url: PMTILES_URL } },
     layers: [{ id: "bg", type: "background", paint: { "background-color": "#eef2f3" } }]
   };
 
+  // Crea el mapa
   const map = new maplibregl.Map({
     container: "map",
     style,
@@ -42,7 +45,7 @@
     zoom: 6
   });
 
-  // Descubre capas del PMTiles y pinta la primera
+  // Descubre capas dentro del PMTiles y pinta la primera
   try {
     const p = new pmtiles.PMTiles(RAW_URL);
     const metadata = await p.getMetadata();
@@ -52,6 +55,7 @@
       alert("No se encontraron capas vectoriales en el PMTiles. ¿Seguro que es vector (pbf)?");
     } else {
       const first = layers[0];
+
       map.on("load", () => {
         map.addLayer({
           id: "poligonos",
@@ -65,9 +69,11 @@
       // UI para cambiar de capa
       const sel = document.getElementById("layerSelect");
       const ui = document.getElementById("ui");
-      layers.forEach(id => { const opt = document.createElement("option"); opt.value = id; opt.textContent = id; sel.appendChild(opt); });
-      sel.value = first;
-      ui.hidden = false;
+      layers.forEach(id => {
+        const opt = document.createElement("option");
+        opt.value = id; opt.textContent = id; sel.appendChild(opt);
+      });
+      sel.value = first; ui.hidden = false;
 
       sel.addEventListener("change", () => {
         if (map.getLayer("poligonos")) map.removeLayer("poligonos");
