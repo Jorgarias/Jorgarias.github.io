@@ -2,50 +2,88 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Mapa secciones censales</title>
+  <title>Mapa PMTiles (auto capas)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link href="https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.css" rel="stylesheet">
-  <style>html,body,#map{height:100%;margin:0}</style>
+  <style>
+    html,body,#map{height:100%;margin:0}
+    #ui{position:absolute;z-index:1;top:10px;left:10px;background:#fff;padding:8px;border-radius:8px;font:14px sans-serif}
+    select{font:inherit}
+  </style>
 </head>
 <body>
 <div id="map"></div>
+<div id="ui" hidden>
+  Capa: <select id="layerSelect"></select>
+</div>
 
 <script type="module">
   import maplibregl from "https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.js";
-  import { Protocol } from "https://unpkg.com/pmtiles@^3/dist/pmtiles.js";
+  import * as pmtiles from "https://unpkg.com/pmtiles@^3/dist/pmtiles.js";
 
-  // habilita protocolo pmtiles://
-  const protocol = new Protocol();
+  // URLs a tu archivo
+  const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
+  const PMTILES_URL = "pmtiles://" + RAW_URL;
+
+  // Habilita el protocolo pmtiles://
+  const protocol = new pmtiles.Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
 
-  // tu archivo .pmtiles en GitHub Pages
-  const PMTILES_URL = "pmtiles://https://jorgarias.github.io/inmigracion.pmtiles";
+  // Lee metadatos para descubrir los 'source-layer'
+  const p = new pmtiles.PMTiles(RAW_URL);
+  const metadata = await p.getMetadata().catch(e => { console.error(e); alert("No se pudieron leer metadatos del PMTiles."); });
+  const layers = (metadata?.vector_layers || []).map(l => l.id);
 
+  // Crea el style base
   const style = {
     version: 8,
-    sources: {
-      censal: { type: "vector", url: PMTILES_URL }
-    },
-    layers: [
-      { id: "fondo", type: "background", paint: {"background-color": "#eeeeee"} },
-      {
-        id: "secciones",
-        type: "fill",
-        source: "censal",
-        "source-layer": "inmigracion",  <!-- cambia si tu capa interna tiene otro nombre -->
-        paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
-      }
-    ]
+    sources: { datos: { type: "vector", url: PMTILES_URL } },
+    layers: [{ id: "bg", type: "background", paint: { "background-color": "#eef2f3" } }]
   };
 
-  new maplibregl.Map({
+  // Si hay capas vectoriales, añade una capa 'fill' para la primera
+  const map = new maplibregl.Map({
     container: "map",
     style,
     center: [-3.7038, 40.4168],
     zoom: 6
   });
+
+  if (layers.length > 0) {
+    const first = layers[0];
+    style.layers.push({
+      id: "poligonos",
+      type: "fill",
+      source: "datos",
+      "source-layer": first,
+      paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
+    });
+    map.setStyle(style);
+
+    // UI para cambiar de capa
+    const sel = document.getElementById("layerSelect");
+    const ui = document.getElementById("ui");
+    layers.forEach(id => { const opt = document.createElement("option"); opt.value = id; opt.textContent = id; sel.appendChild(opt); });
+    sel.value = first;
+    ui.hidden = false;
+
+    sel.addEventListener("change", () => {
+      map.setLayoutProperty("poligonos", "visibility", "none");
+      map.removeLayer("poligonos");
+      map.addLayer({
+        id: "poligonos",
+        type: "fill",
+        source: "datos",
+        "source-layer": sel.value,
+        paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
+      });
+    });
+  } else {
+    console.warn("No se encontraron 'vector_layers' en los metadatos. ¿Seguro que es vector (pbf)?");
+    alert("No se encontraron capas vectoriales en los metadatos del PMTiles.");
+  }
 </script>
 </body>
-
 </html>
+
 
