@@ -4,7 +4,9 @@
   <meta charset="utf-8" />
   <title>Mapa PMTiles</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@3/dist/maplibre-gl.css" rel="stylesheet">
+  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
+  <!-- MapLibre JS global (no módulo) -->
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <style>
     html,body,#map{height:100%;margin:0}
     #ui{position:absolute;z-index:1;top:10px;left:10px;background:#fff;padding:8px;border-radius:8px;font:14px sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.1)}
@@ -17,17 +19,17 @@
   Capa: <select id="layerSelect"></select>
 </div>
 
+<!-- Tu lógica en módulo (solo PMTiles en ESM) -->
 <script type="module">
-  // IMPORTS (en v3 addProtocol es export nombrada)
-  import { Map, addProtocol } from "https://cdn.jsdelivr.net/npm/maplibre-gl@3/dist/maplibre-gl.js";
   import { PMTiles, Protocol } from "https://esm.sh/pmtiles@4";
 
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + RAW_URL;
 
-  // Registrar el protocolo pmtiles://
+  // Registrar el protocolo pmtiles:// usando la API global de MapLibre
   const protocol = new Protocol();
-  addProtocol("pmtiles", protocol.tile);
+  // window.maplibregl viene del <script> global
+  maplibregl.addProtocol("pmtiles", protocol.tile);
 
   // Style base vacío
   const style = {
@@ -36,16 +38,16 @@
     layers: [{ id: "bg", type: "background", paint: { "background-color": "#eef2f3" } }]
   };
 
-  // Crear mapa
-  const map = new Map({
+  // Crear mapa (API global)
+  const map = new maplibregl.Map({
     container: "map",
     style,
     center: [-3.7038, 40.4168],
     zoom: 6
   });
 
-  // Detectar si el PMTiles es vector o ráster y pintarlo
   try {
+    // Lee metadatos del PMTiles para detectar si es vector o ráster
     const p = new PMTiles(RAW_URL);
     const metadata = await p.getMetadata();
     const vectorLayers = (metadata?.vector_layers || []).map(l => l.id);
@@ -65,11 +67,12 @@
           paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.8 }
         });
 
-        // selector de capas
+        // Selector de capas
         const sel = document.getElementById("layerSelect");
         const ui = document.getElementById("ui");
         vectorLayers.forEach(id => {
-          const o = document.createElement("option"); o.value = id; o.textContent = id; sel.appendChild(o);
+          const opt = document.createElement("option");
+          opt.value = id; opt.textContent = id; sel.appendChild(opt);
         });
         sel.value = first; ui.hidden = false;
 
@@ -92,7 +95,7 @@
     });
   } catch (e) {
     console.error(e);
-    alert("Error leyendo metadatos del PMTiles. Abre la consola (F12 → Console) para más detalle.");
+    alert("Error leyendo metadatos del PMTiles. Abre la consola (F12 → Console) para ver detalles.");
   }
 </script>
 </body>
