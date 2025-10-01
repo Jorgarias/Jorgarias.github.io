@@ -23,7 +23,7 @@
   const PMTILES_URL = "pmtiles://" + RAW_URL;
   const LAYER_ID = "secciones";     // <- del metadata nuevo
   const LAYER_MINZOOM = 3;
-  const LAYER_MAXZOOM = 10;
+  const LAYER_MAXZOOM = 15;
 
   // Registrar protocolo pmtiles://
   const protocol = new Protocol();
@@ -47,7 +47,7 @@
     container: "map",
     style,
     center: [-3.7, 40.4],
-    zoom: 5
+    zoom: 6
   });
   map.addControl(new maplibregl.NavigationControl());
 
@@ -102,3 +102,4 @@
 </script>
 </body>
 </html>
+
