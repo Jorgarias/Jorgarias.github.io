@@ -2,32 +2,34 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Mapa PMTiles — inmigracion</title>
+  <title>Secciones — inmigración (PMTiles)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
-  <!-- MapLibre global (no módulo) -->
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <style>
     html,body,#map{height:100%;margin:0}
-    #ui{position:absolute;z-index:1;top:10px;left:10px;background:#fff;padding:8px;border-radius:8px;font:14px sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+    #legend{position:absolute;z-index:1;bottom:10px;left:10px;background:#fff;padding:8px 10px;border-radius:8px;font:12px system-ui;box-shadow:0 2px 8px rgba(0,0,0,.1)}
   </style>
 </head>
 <body>
 <div id="map"></div>
+<div id="legend">Relleno por <code>diff_pct_ext</code></div>
 
 <script type="module">
   import { PMTiles, Protocol } from "https://esm.sh/pmtiles@4";
 
-  // --- TU ARCHIVO ---
+  // --- TU ARCHIVO (mismo nombre, contenido nuevo) ---
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + RAW_URL;
-  const LAYER_ID = "inmigracion";   // 👈 nombre de la capa dentro del PMTiles
+  const LAYER_ID = "secciones";     // <- del metadata nuevo
+  const LAYER_MINZOOM = 3;
+  const LAYER_MAXZOOM = 10;
 
   // Registrar protocolo pmtiles://
   const protocol = new Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
 
-  // Style con fondo OSM para orientarse
+  // Fondo OSM (carreteras/labels)
   const style = {
     version: 8,
     sources: {
@@ -49,41 +51,54 @@
   });
   map.addControl(new maplibregl.NavigationControl());
 
-  // Lee metadatos para encuadrar y por si hace falta depurar
+  // Encadre usando metadatos
   const p = new PMTiles(RAW_URL);
   const metadata = await p.getMetadata();
-  console.log("PMTiles metadata:", metadata);
-
-  // Encudre con antimeridian_adjusted_bounds si existe
   const boundsStr = metadata.antimeridian_adjusted_bounds || metadata.bounds;
   if (boundsStr) {
     const [w,s,e,n] = boundsStr.split(",").map(Number);
     map.fitBounds([[w,s],[e,n]], { padding: 30, duration: 0 });
   }
 
-  // Pinta la capa vectorial usando el source-layer correcto
+  // Gradiente por diff_pct_ext
+  const fillColor = [
+    "case",
+    ["has","diff_pct_ext"],
+    ["interpolate", ["linear"], ["get","diff_pct_ext"],
+      -47.16126130501527, "#f74545",
+      0,                     "#e8e8e8",
+      25.71,                 "#0154a7"
+    ],
+    "#cccccc" // si no existe el campo
+  ];
+
   map.on("load", () => {
+    // Fuente vectorial desde PMTiles
     map.addSource("datos", { type: "vector", url: PMTILES_URL });
 
-    // Relleno (polígonos)
+    // Relleno (sin puntos)
     map.addLayer({
-      id: "inm-fill",
+      id: "sec-fill",
       type: "fill",
       source: "datos",
       "source-layer": LAYER_ID,
-      paint: { "fill-color": "#2b8cbe", "fill-opacity": 0.55 }
+      minzoom: LAYER_MINZOOM,
+      maxzoom: LAYER_MAXZOOM,
+      paint: { "fill-color": fillColor, "fill-opacity": 0.7 }
     });
 
-    // Contorno
+    // Contorno fino
     map.addLayer({
-      id: "inm-line",
+      id: "sec-line",
       type: "line",
       source: "datos",
       "source-layer": LAYER_ID,
-      paint: { "line-color": "#1b4f72", "line-width": 0.7 }
+      minzoom: LAYER_MINZOOM,
+      maxzoom: LAYER_MAXZOOM,
+      layout: { "line-join": "round", "line-cap": "round" },
+      paint: { "line-color": "#202d3a", "line-width": 0.4, "line-opacity": 0.8 }
     });
   });
 </script>
 </body>
 </html>
-
