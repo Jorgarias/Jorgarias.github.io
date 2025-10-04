@@ -5,6 +5,7 @@
   <title>Secciones — inmigración (PMTiles)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
+  <!-- MapLibre global (no módulo) -->
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <style>
     html,body,#map{height:100%;margin:0}
@@ -13,17 +14,18 @@
 </head>
 <body>
 <div id="map"></div>
-<div id="legend">Relleno por <code>diff_pct_ext</code></div>
+<div id="legend">Relleno por <code>diff_pct_ext</code> (z6–z12, overzoom activado)</div>
 
 <script type="module">
   import { PMTiles, Protocol } from "https://esm.sh/pmtiles@4";
 
-  // --- TU ARCHIVO (mismo nombre, contenido nuevo) ---
+  // --- TU ARCHIVO (mismo nombre) ---
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + RAW_URL;
-  const LAYER_ID = "secciones";     // <- del metadata nuevo
-  const LAYER_MINZOOM = 3;
-  const LAYER_MAXZOOM = 15;
+
+  // Metadatos aportados
+  const LAYER_ID = "secciones";
+  const LAYER_MINZOOM = 6; // el tileset empieza en z6
 
   // Registrar protocolo pmtiles://
   const protocol = new Protocol();
@@ -51,7 +53,7 @@
   });
   map.addControl(new maplibregl.NavigationControl());
 
-  // Encadre usando metadatos
+  // Encadre usando metadatos (antimeridian_adjusted_bounds)
   const p = new PMTiles(RAW_URL);
   const metadata = await p.getMetadata();
   const boundsStr = metadata.antimeridian_adjusted_bounds || metadata.bounds;
@@ -63,13 +65,14 @@
   // Gradiente por diff_pct_ext
   const fillColor = [
     "case",
-    ["has","diff_pct_ext"],
-    ["interpolate", ["linear"], ["get","diff_pct_ext"],
+    ["has", "diff_pct_ext"],
+    [
+      "interpolate", ["linear"], ["get", "diff_pct_ext"],
       -47.16126130501527, "#f74545",
-      0,                     "#e8e8e8",
-      25.71,                 "#0154a7"
+      0,                   "#e8e8e8",
+      25.71,               "#0154a7"
     ],
-    "#cccccc" // si no existe el campo
+    "#cccccc"
   ];
 
   map.on("load", () => {
@@ -82,9 +85,12 @@
       type: "fill",
       source: "datos",
       "source-layer": LAYER_ID,
-      minzoom: LAYER_MINZOOM,
-      maxzoom: LAYER_MAXZOOM,
-      paint: { "fill-color": fillColor, "fill-opacity": 0.7 }
+      minzoom: LAYER_MINZOOM,              // sin maxzoom → overzoom permitido
+      paint: {
+        "fill-color": fillColor,
+        "fill-opacity": 0.70,
+        "fill-antialias": true
+      }
     });
 
     // Contorno fino
@@ -94,12 +100,10 @@
       source: "datos",
       "source-layer": LAYER_ID,
       minzoom: LAYER_MINZOOM,
-      maxzoom: LAYER_MAXZOOM,
       layout: { "line-join": "round", "line-cap": "round" },
-      paint: { "line-color": "#202d3a", "line-width": 0.4, "line-opacity": 0.8 }
+      paint: { "line-color": "#202d3a", "line-width": 0.35, "line-opacity": 0.85 }
     });
   });
 </script>
 </body>
 </html>
-
