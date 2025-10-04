@@ -5,44 +5,33 @@
   <title>Secciones — inmigración (PMTiles)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
-  <!-- MapLibre global (no módulo) -->
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <style>
-    html,body,#map{height:100%;margin:0}
-    #legend{position:absolute;z-index:1;bottom:10px;left:10px;background:#fff;padding:8px 10px;border-radius:8px;font:12px system-ui;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+    html,body,#map{height:100%;margin:0;background:#f0f0f0}
   </style>
 </head>
 <body>
 <div id="map"></div>
-<div id="legend">Relleno por <code>diff_pct_ext</code> (z6–z12, overzoom activado)</div>
 
 <script type="module">
   import { PMTiles, Protocol } from "https://esm.sh/pmtiles@4";
 
-  // --- TU ARCHIVO (mismo nombre) ---
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + RAW_URL;
-
-  // Metadatos aportados
-  const LAYER_ID = "secciones";
-  const LAYER_MINZOOM = 6; // el tileset empieza en z6
+  const LAYER_ID = "secciones";     // capa interna
+  const LAYER_MINZOOM = 6;          // tu tileset empieza en z6
 
   // Registrar protocolo pmtiles://
   const protocol = new Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
 
-  // Fondo OSM (carreteras/labels)
+  // Estilo SIN base, con fondo #f0f0f0
   const style = {
     version: 8,
-    sources: {
-      osm: {
-        type: "raster",
-        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-        tileSize: 256,
-        attribution: "© OpenStreetMap contributors"
-      }
-    },
-    layers: [{ id: "osm", type: "raster", source: "osm" }]
+    sources: {},
+    layers: [
+      { id: "bg", type: "background", paint: { "background-color": "#f0f0f0" } }
+    ]
   };
 
   const map = new maplibregl.Map({
@@ -51,9 +40,8 @@
     center: [-3.7, 40.4],
     zoom: 6
   });
-  map.addControl(new maplibregl.NavigationControl());
 
-  // Encadre usando metadatos (antimeridian_adjusted_bounds)
+  // Encadre con metadatos si existen
   const p = new PMTiles(RAW_URL);
   const metadata = await p.getMetadata();
   const boundsStr = metadata.antimeridian_adjusted_bounds || metadata.bounds;
@@ -62,12 +50,11 @@
     map.fitBounds([[w,s],[e,n]], { padding: 30, duration: 0 });
   }
 
-  // Gradiente por diff_pct_ext
+  // Gradiente por diff_pct_ext (sin bordes)
   const fillColor = [
     "case",
-    ["has", "diff_pct_ext"],
-    [
-      "interpolate", ["linear"], ["get", "diff_pct_ext"],
+    ["has","diff_pct_ext"],
+    ["interpolate", ["linear"], ["get","diff_pct_ext"],
       -47.16126130501527, "#f74545",
       0,                   "#e8e8e8",
       25.71,               "#0154a7"
@@ -76,33 +63,22 @@
   ];
 
   map.on("load", () => {
-    // Fuente vectorial desde PMTiles
     map.addSource("datos", { type: "vector", url: PMTILES_URL });
 
-    // Relleno (sin puntos)
     map.addLayer({
       id: "sec-fill",
       type: "fill",
       source: "datos",
       "source-layer": LAYER_ID,
-      minzoom: LAYER_MINZOOM,              // sin maxzoom → overzoom permitido
+      minzoom: LAYER_MINZOOM,   // sin maxzoom → overzoom ok
       paint: {
         "fill-color": fillColor,
-        "fill-opacity": 0.70,
+        "fill-opacity": 0.9,
         "fill-antialias": true
       }
     });
 
-    // Contorno fino
-    map.addLayer({
-      id: "sec-line",
-      type: "line",
-      source: "datos",
-      "source-layer": LAYER_ID,
-      minzoom: LAYER_MINZOOM,
-      layout: { "line-join": "round", "line-cap": "round" },
-      paint: { "line-color": "#202d3a", "line-width": 0.35, "line-opacity": 0.85 }
-    });
+    // No añadimos capa de línea → sin bordes
   });
 </script>
 </body>
