@@ -16,15 +16,19 @@
 <script type="module">
   import { PMTiles, Protocol } from "https://esm.sh/pmtiles@4";
 
-  const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
-  const PMTILES_URL = "pmtiles://" + RAW_URL;
-  const LAYER_ID = "secciones";   // capa interna de tu PMTiles
+  // --- Tus datos ---
+  const PMTILES_RAW = "https://jorgarias.github.io/inmigracion.pmtiles";
+  const PMTILES_URL = "pmtiles://" + PMTILES_RAW;
+  const LAYER_ID = "secciones"; // capa interna del PMTiles
 
-  // registra el protocolo pmtiles://
+  const CCAA_URL = "https://jorgarias.github.io/CCAA.geojson";
+  const PROV_URL = "https://jorgarias.github.io/PROVINCIA.geojson";
+
+  // Registrar protocolo pmtiles://
   const protocol = new Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
 
-  // estilo SIN mapa base, solo fondo
+  // Estilo sin base (fondo gris)
   const style = {
     version: 8,
     sources: {},
@@ -38,7 +42,7 @@
     zoom: 6
   });
 
-  // expresión de color por diff_pct_ext (sin bordes)
+  // Color por diff_pct_ext (sin bordes)
   const fillColor = [
     "case",
     ["has","diff_pct_ext"],
@@ -50,36 +54,45 @@
     "#cccccc"
   ];
 
-  // espera a que el estilo cargue para añadir la fuente y la capa
   map.on("load", async () => {
+    // 1) Secciones (relleno)
+    map.addSource("secciones", { type: "vector", url: PMTILES_URL });
+    map.addLayer({
+      id: "sec-fill",
+      type: "fill",
+      source: "secciones",
+      "source-layer": LAYER_ID,
+      paint: { "fill-color": fillColor, "fill-opacity": 0.9, "fill-antialias": true }
+    });
+
+    // 2) Provincias (línea fina)
+    map.addSource("provincias", { type: "geojson", data: PROV_URL });
+    map.addLayer({
+      id: "prov-line",
+      type: "line",
+      source: "provincias",
+      paint: { "line-color": "#30343b", "line-width": 0.7, "line-opacity": 0.75 }
+    });
+
+    // 3) CCAA (línea más gruesa, por encima)
+    map.addSource("ccaa", { type: "geojson", data: CCAA_URL });
+    map.addLayer({
+      id: "ccaa-line",
+      type: "line",
+      source: "ccaa",
+      paint: { "line-color": "#30343b", "line-width": 1.4, "line-opacity": 0.85 }
+    });
+
+    // 4) Encadre con metadatos del PMTiles
     try {
-      // añade la fuente del PMTiles y la capa de relleno
-      map.addSource("datos", { type: "vector", url: PMTILES_URL });
-
-      map.addLayer({
-        id: "sec-fill",
-        type: "fill",
-        source: "datos",
-        "source-layer": LAYER_ID,
-        paint: {
-          "fill-color": fillColor,
-          "fill-opacity": 0.9,
-          "fill-antialias": true
-        }
-      });
-
-      // encuadra usando metadatos
-      const p = new PMTiles(RAW_URL);
-      const metadata = await p.getMetadata();
-      const boundsStr = metadata.antimeridian_adjusted_bounds || metadata.bounds;
-      if (boundsStr) {
-        const [w,s,e,n] = boundsStr.split(",").map(Number);
+      const p = new PMTiles(PMTILES_RAW);
+      const md = await p.getMetadata();
+      const b = md.antimeridian_adjusted_bounds || md.bounds;
+      if (b) {
+        const [w,s,e,n] = b.split(",").map(Number);
         map.fitBounds([[w,s],[e,n]], { padding: 30, duration: 0 });
       }
-    } catch (e) {
-      console.error("Error cargando capa PMTiles:", e);
-      alert("No se pudo cargar la capa PMTiles. Mira la consola (F12 → Console).");
-    }
+    } catch {}
   });
 </script>
 </body>
