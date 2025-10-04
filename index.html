@@ -18,20 +18,17 @@
 
   const RAW_URL = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + RAW_URL;
-  const LAYER_ID = "secciones";     // capa interna
-  const LAYER_MINZOOM = 6;          // tu tileset empieza en z6
+  const LAYER_ID = "secciones";   // capa interna de tu PMTiles
 
-  // Registrar protocolo pmtiles://
+  // registra el protocolo pmtiles://
   const protocol = new Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
 
-  // Estilo SIN base, con fondo #f0f0f0
+  // estilo SIN mapa base, solo fondo
   const style = {
     version: 8,
     sources: {},
-    layers: [
-      { id: "bg", type: "background", paint: { "background-color": "#f0f0f0" } }
-    ]
+    layers: [{ id: "bg", type: "background", paint: { "background-color": "#f0f0f0" } }]
   };
 
   const map = new maplibregl.Map({
@@ -41,16 +38,7 @@
     zoom: 6
   });
 
-  // Encadre con metadatos si existen
-  const p = new PMTiles(RAW_URL);
-  const metadata = await p.getMetadata();
-  const boundsStr = metadata.antimeridian_adjusted_bounds || metadata.bounds;
-  if (boundsStr) {
-    const [w,s,e,n] = boundsStr.split(",").map(Number);
-    map.fitBounds([[w,s],[e,n]], { padding: 30, duration: 0 });
-  }
-
-  // Gradiente por diff_pct_ext (sin bordes)
+  // expresión de color por diff_pct_ext (sin bordes)
   const fillColor = [
     "case",
     ["has","diff_pct_ext"],
@@ -62,23 +50,36 @@
     "#cccccc"
   ];
 
-  map.on("load", () => {
-    map.addSource("datos", { type: "vector", url: PMTILES_URL });
+  // espera a que el estilo cargue para añadir la fuente y la capa
+  map.on("load", async () => {
+    try {
+      // añade la fuente del PMTiles y la capa de relleno
+      map.addSource("datos", { type: "vector", url: PMTILES_URL });
 
-    map.addLayer({
-      id: "sec-fill",
-      type: "fill",
-      source: "datos",
-      "source-layer": LAYER_ID,
-      minzoom: LAYER_MINZOOM,   // sin maxzoom → overzoom ok
-      paint: {
-        "fill-color": fillColor,
-        "fill-opacity": 0.9,
-        "fill-antialias": true
+      map.addLayer({
+        id: "sec-fill",
+        type: "fill",
+        source: "datos",
+        "source-layer": LAYER_ID,
+        paint: {
+          "fill-color": fillColor,
+          "fill-opacity": 0.9,
+          "fill-antialias": true
+        }
+      });
+
+      // encuadra usando metadatos
+      const p = new PMTiles(RAW_URL);
+      const metadata = await p.getMetadata();
+      const boundsStr = metadata.antimeridian_adjusted_bounds || metadata.bounds;
+      if (boundsStr) {
+        const [w,s,e,n] = boundsStr.split(",").map(Number);
+        map.fitBounds([[w,s],[e,n]], { padding: 30, duration: 0 });
       }
-    });
-
-    // No añadimos capa de línea → sin bordes
+    } catch (e) {
+      console.error("Error cargando capa PMTiles:", e);
+      alert("No se pudo cargar la capa PMTiles. Mira la consola (F12 → Console).");
+    }
   });
 </script>
 </body>
