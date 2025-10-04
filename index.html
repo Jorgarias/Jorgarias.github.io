@@ -16,10 +16,10 @@
 <script type="module">
   import { PMTiles, Protocol } from "https://esm.sh/pmtiles@4";
 
-  // --- Tus datos ---
+  // --- Rutas / nombres de capas ---
   const PMTILES_RAW = "https://jorgarias.github.io/inmigracion.pmtiles";
   const PMTILES_URL = "pmtiles://" + PMTILES_RAW;
-  const LAYER_ID = "secciones"; // capa interna del PMTiles
+  const LAYER_ID = "secciones";
 
   const CCAA_URL = "https://jorgarias.github.io/CCAA.geojson";
   const PROV_URL = "https://jorgarias.github.io/PROVINCIA.geojson";
@@ -28,11 +28,13 @@
   const protocol = new Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
 
-  // Estilo sin base (fondo gris)
+  // Estilo base (fondo gris)
   const style = {
     version: 8,
     sources: {},
-    layers: [{ id: "bg", type: "background", paint: { "background-color": "#f0f0f0" } }]
+    layers: [
+      { id: "bg", type: "background", paint: { "background-color": "#f0f0f0" } }
+    ]
   };
 
   const map = new maplibregl.Map({
@@ -42,7 +44,7 @@
     zoom: 6
   });
 
-  // Color por diff_pct_ext (sin bordes)
+  // Gradiente por diff_pct_ext
   const fillColor = [
     "case",
     ["has","diff_pct_ext"],
@@ -55,45 +57,80 @@
   ];
 
   map.on("load", async () => {
-    // 1) Secciones (relleno)
-    map.addSource("secciones", { type: "vector", url: PMTILES_URL });
-    map.addLayer({
-      id: "sec-fill",
-      type: "fill",
-      source: "secciones",
-      "source-layer": LAYER_ID,
-      paint: { "fill-color": fillColor, "fill-opacity": 0.9, "fill-antialias": true }
-    });
-
-    // 2) Provincias (línea fina)
-    map.addSource("provincias", { type: "geojson", data: PROV_URL });
-    map.addLayer({
-      id: "prov-line",
-      type: "line",
-      source: "provincias",
-      paint: { "line-color": "#30343b", "line-width": 0.7, "line-opacity": 0.75 }
-    });
-
-    // 3) CCAA (línea más gruesa, por encima)
-    map.addSource("ccaa", { type: "geojson", data: CCAA_URL });
-    map.addLayer({
-      id: "ccaa-line",
-      type: "line",
-      source: "ccaa",
-      paint: { "line-color": "#30343b", "line-width": 1.4, "line-opacity": 0.85 }
-    });
-
-    // 4) Encadre con metadatos del PMTiles
     try {
-      const p = new PMTiles(PMTILES_RAW);
-      const md = await p.getMetadata();
-      const b = md.antimeridian_adjusted_bounds || md.bounds;
-      if (b) {
-        const [w,s,e,n] = b.split(",").map(Number);
-        map.fitBounds([[w,s],[e,n]], { padding: 30, duration: 0 });
+      // 1) Secciones (PMTiles) — relleno sin bordes
+      map.addSource("secciones", { type: "vector", url: PMTILES_URL });
+      map.addLayer({
+        id: "sec-fill",
+        type: "fill",
+        source: "secciones",
+        "source-layer": LAYER_ID,
+        paint: { "fill-color": fillColor, "fill-opacity": 0.9, "fill-antialias": true }
+      });
+
+      // 2) Provincias (línea con grosor variable por zoom)
+      map.addSource("provincias", { type: "geojson", data: PROV_URL });
+      map.addLayer({
+        id: "prov-line",
+        type: "line",
+        source: "provincias",
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: {
+          "line-color": "#30343b",
+          "line-opacity": 0.8,
+          "line-width": [
+            "interpolate", ["linear"], ["zoom"],
+            4, 0.6,
+            6, 1.2,
+            8, 1.8,
+            10, 2.2,
+            12, 2.6
+          ]
+        }
+      });
+
+      // 3) CCAA (línea más gruesa, encima)
+      map.addSource("ccaa", { type: "geojson", data: CCAA_URL });
+      map.addLayer({
+        id: "ccaa-line",
+        type: "line",
+        source: "ccaa",
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: {
+          "line-color": "#30343b",
+          "line-opacity": 0.9,
+          "line-width": [
+            "interpolate", ["linear"], ["zoom"],
+            4, 1.0,
+            6, 1.8,
+            8, 2.6,
+            10, 3.2,
+            12, 3.8
+          ]
+        }
+      });
+
+      // 4) Encadre según metadatos del PMTiles (si están disponibles)
+      try {
+        const p = new PMTiles(PMTILES_RAW);
+        const md = await p.getMetadata();
+        const b = md.antimeridian_adjusted_bounds || md.bounds;
+        if (b) {
+          const [w,s,e,n] = b.split(",").map(Number);
+          map.fitBounds([[w,s],[e,n]], { padding: 30, duration: 0 });
+        }
+      } catch (metaErr) {
+        // no crítico: si falla, no hacemos fitBounds
+        console.warn("No se pudieron leer metadatos PMTiles:", metaErr);
       }
-    } catch {}
+
+    } catch (e) {
+      console.error("Error cargando capas:", e);
+      alert("Error cargando datos. Revisa la consola (F12 → Console).");
+    }
   });
 </script>
 </body>
 </html>
+
+
