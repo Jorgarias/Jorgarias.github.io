@@ -68,7 +68,7 @@
         paint: { "fill-color": fillColor, "fill-opacity": 0.9, "fill-antialias": true }
       });
 
-      // 2) Provincias (línea con grosor variable por zoom)
+      // 2) Provincias (línea con grosor variable por zoom) -- reducido
       map.addSource("provincias", { type: "geojson", data: PROV_URL });
       map.addLayer({
         id: "prov-line",
@@ -80,16 +80,16 @@
           "line-opacity": 0.8,
           "line-width": [
             "interpolate", ["linear"], ["zoom"],
-            4, 0.6,
-            6, 1.2,
-            8, 1.8,
-            10, 2.2,
-            12, 2.6
+            4, 0.5,   // reducido
+            6, 0.9,   // reducido
+            8, 1.4,   // reducido
+            10, 1.8,  // reducido
+            12, 2.2   // reducido
           ]
         }
       });
 
-      // 3) CCAA (línea más gruesa, encima)
+      // 3) CCAA (línea más gruesa, encima) -- reducido
       map.addSource("ccaa", { type: "geojson", data: CCAA_URL });
       map.addLayer({
         id: "ccaa-line",
@@ -101,11 +101,11 @@
           "line-opacity": 0.9,
           "line-width": [
             "interpolate", ["linear"], ["zoom"],
-            4, 1.0,
-            6, 1.8,
-            8, 2.6,
-            10, 3.2,
-            12, 3.8
+            4, 0.8,   // reducido
+            6, 1.4,   // reducido
+            8, 2.0,   // reducido
+            10, 2.6,  // reducido
+            12, 3.2   // reducido
           ]
         }
       });
@@ -120,7 +120,6 @@
           map.fitBounds([[w,s],[e,n]], { padding: 30, duration: 0 });
         }
       } catch (metaErr) {
-        // no crítico: si falla, no hacemos fitBounds
         console.warn("No se pudieron leer metadatos PMTiles:", metaErr);
       }
 
@@ -132,5 +131,3 @@
 </script>
 </body>
 </html>
-
-
